@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import MonacoEditor, { OnMount, useMonaco } from '@monaco-editor/react';
-import { Play, AlignLeft, Palette } from 'lucide-react';
+import { Play, AlignLeft, Palette, Eye, EyeOff } from 'lucide-react';
 
 interface EditorProps {
   content: string;
@@ -10,12 +10,42 @@ interface EditorProps {
   isRunning: boolean;
   isFormatting?: boolean;
   fileName: string;
+  isPreviewOpen?: boolean;
+  onTogglePreview?: () => void;
 }
 
-export const Editor: React.FC<EditorProps> = ({ content, onChange, onRun, onFormat, isRunning, isFormatting, fileName }) => {
+const getLanguageFromFileName = (name: string): string => {
+  const ext = name.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'py': return 'python';
+    case 'js': return 'javascript';
+    case 'jsx': return 'javascript';
+    case 'ts': return 'typescript';
+    case 'tsx': return 'typescript';
+    case 'html': case 'htm': return 'html';
+    case 'css': return 'css';
+    case 'json': return 'json';
+    case 'md': return 'markdown';
+    default: return 'plaintext';
+  }
+};
+
+export const Editor: React.FC<EditorProps> = ({ 
+  content, 
+  onChange, 
+  onRun, 
+  onFormat, 
+  isRunning, 
+  isFormatting, 
+  fileName,
+  isPreviewOpen = true,
+  onTogglePreview
+}) => {
   const editorRef = useRef<any>(null);
   const [theme, setTheme] = useState('aether-dark');
   const monacoInstance = useMonaco();
+
+  const isWebFile = ['html', 'htm', 'js', 'jsx', 'ts', 'tsx', 'css'].includes(fileName.split('.').pop()?.toLowerCase() || '');
 
   useEffect(() => {
     if (monacoInstance) {
@@ -113,20 +143,30 @@ export const Editor: React.FC<EditorProps> = ({ content, onChange, onRun, onForm
               {isFormatting ? 'Formatting...' : 'Format'}
             </button>
           )}
+          {isWebFile && onTogglePreview && (
+            <button
+              onClick={onTogglePreview}
+              className="flex items-center gap-2 px-3 py-1.5 bg-dark-border hover:bg-dark-border/80 text-text-muted hover:text-text-main rounded-md transition-colors font-serif italic tracking-wide text-sm"
+              title={isPreviewOpen ? "Hide Preview View" : "Split Preview View"}
+            >
+              {isPreviewOpen ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              <span>{isPreviewOpen ? 'Hide Preview' : 'Show Preview'}</span>
+            </button>
+          )}
           <button
             onClick={onRun}
-            disabled={isRunning || isFormatting}
+            disabled={(!isWebFile && isRunning) || isFormatting}
             className="flex items-center gap-2 px-3 py-1.5 bg-dark-border hover:bg-dark-border/80 text-gold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-serif italic tracking-wide text-sm"
           >
             <Play className="w-4 h-4" />
-            {isRunning ? 'Executing...' : 'Run Script'}
+            <span>{isWebFile ? 'Sync Preview' : (isRunning ? 'Executing...' : 'Run Script')}</span>
           </button>
         </div>
       </div>
       <div className="flex-1 w-full relative">
         <MonacoEditor
           height="100%"
-          language="python"
+          language={getLanguageFromFileName(fileName)}
           theme={theme}
           value={content}
           onChange={onChange}

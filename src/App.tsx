@@ -8,6 +8,7 @@ import { FileExplorer } from './components/FileExplorer';
 import { Editor } from './components/Editor';
 import { TerminalPanel } from './components/Terminal';
 import { EditorTabs } from './components/EditorTabs';
+import { LivePreview } from './components/LivePreview';
 import { FileNode, TerminalOutput, TerminalInstance } from './types';
 import PyodideWorker from './pyodide.worker.ts?worker';
 
@@ -28,8 +29,144 @@ sequence = fibonacci(100)
 print(f"Fibonacci sequence up to 100: {sequence}")
 `;
 
+const DEFAULT_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aether Live Web Preview</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🌌</div>
+    <h1>Aether Web Engine</h1>
+    <p>Live, high-fidelity browser sandbox loaded within your project workspace.</p>
+    
+    <div class="editor-info">
+      <span>Status: <strong id="status">Active</strong></span>
+      <span>Engine: <strong>IFrame Sandbox</strong></span>
+    </div>
+
+    <button id="action-btn">Trigger Interactive Log</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+`;
+
+const DEFAULT_CSS = `/* Slate & Gold Design System */
+body {
+  margin: 0;
+  padding: 0;
+  background: radial-gradient(circle at center, #14151c 0%, #0b0c10 100%);
+  color: #e2e4e9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.card {
+  background: rgba(14, 15, 20, 0.85);
+  border: 1px solid rgba(197, 168, 128, 0.15);
+  border-radius: 12px;
+  padding: 32px;
+  width: 90%;
+  max-width: 440px;
+  text-align: center;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.3s ease;
+}
+
+.card:hover {
+  border-color: rgba(197, 168, 128, 0.35);
+}
+
+.icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+}
+
+h1 {
+  font-size: 1.8rem;
+  color: #c5a880;
+  margin: 0 0 12px 0;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+p {
+  color: #9cb2c0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0 0 24px 0;
+}
+
+.editor-info {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-family: monospace;
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+#status {
+  color: #4ade80;
+}
+
+button {
+  background: #c5a880;
+  color: #0b0c10;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 24px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+button:hover {
+  background: #d9bd96;
+}
+`;
+
+const DEFAULT_JS = `// Interactive Scripts for Aether Live Preview
+console.log("🌌 Aether Workspace Script Initialized!");
+
+const statusEl = document.getElementById("status");
+const actionBtn = document.getElementById("action-btn");
+
+let tapCount = 0;
+
+if (actionBtn) {
+  actionBtn.addEventListener("click", () => {
+    tapCount++;
+    if (statusEl) {
+      statusEl.textContent = "Interacted (" + tapCount + ")";
+      statusEl.style.color = "#c5a880";
+    }
+    
+    // Send standard log right back to UI console automatically
+    console.log("[Web Action] Console logger triggered " + tapCount + " times!");
+  });
+}
+`;
+
 const INITIAL_FILES: FileNode[] = [
-  { id: '1', name: 'main.py', content: DEFAULT_CODE }
+  { id: '1', name: 'main.py', content: DEFAULT_CODE },
+  { id: '2', name: 'index.html', content: DEFAULT_HTML },
+  { id: '3', name: 'style.css', content: DEFAULT_CSS },
+  { id: '4', name: 'app.js', content: DEFAULT_JS }
 ];
 
 export default function App() {
@@ -37,7 +174,12 @@ export default function App() {
     const saved = localStorage.getItem('aether_files');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Ensure standard project files always exist or are loaded appropriately
+        if (parsed && parsed.length > 0) {
+          return parsed;
+        }
+        return INITIAL_FILES;
       } catch (e) {
         return INITIAL_FILES;
       }
@@ -45,8 +187,28 @@ export default function App() {
     return INITIAL_FILES;
   });
   
-  const [activeFileId, setActiveFileId] = useState<string>(files[0]?.id || '1');
-  const [openFileIds, setOpenFileIds] = useState<string[]>([files[0]?.id || '1']);
+  const [activeFileId, setActiveFileId] = useState<string>(() => {
+    // If we have saved files, find the first or stick with default '1'
+    const saved = localStorage.getItem('aether_files');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.length > 0) return parsed[0].id;
+      } catch (e) {}
+    }
+    return '1';
+  });
+
+  const [openFileIds, setOpenFileIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem('aether_files');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.length > 0) return [parsed[0].id];
+      } catch (e) {}
+    }
+    return ['1'];
+  });
   
   const [terminals, setTerminals] = useState<TerminalInstance[]>([{ id: '1', name: 'Terminal 1', output: [] }]);
   const [activeTerminalId, setActiveTerminalId] = useState<string>('1');
@@ -59,6 +221,7 @@ export default function App() {
   const [isPyodideReady, setIsPyodideReady] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(true);
   const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
@@ -183,20 +346,32 @@ except Exception as e:
     workerRef.current.postMessage({ action: 'run', id: Date.now(), python: pythonCode });
   };
 
-  const handleRun = () => {
-    if (!isPyodideReady || !workerRef.current) {
-      addLog('error', 'Environment is not ready yet. Please wait.');
+  const handleRun = useCallback(() => {
+    const activeFile = files.find(f => f.id === activeFileId);
+    if (!activeFile) return;
+
+    const ext = activeFile.name.split('.').pop()?.toLowerCase() || '';
+    const isWebFile = ['html', 'htm', 'js', 'jsx', 'ts', 'tsx', 'css'].includes(ext);
+
+    if (isWebFile) {
+      addLog('system', `> Refreshing sandbox live preview for ${activeFile.name}...`);
+      if (!isPreviewOpen) {
+        setIsPreviewOpen(true);
+      }
+      addLog('log', `[Web Engine] Frame refreshed successfully.`);
       return;
     }
 
-    const activeFile = files.find(f => f.id === activeFileId);
-    if (!activeFile) return;
+    if (!isPyodideReady || !workerRef.current) {
+      addLog('error', 'Pyodide environment is not ready yet. Please wait.');
+      return;
+    }
 
     setIsRunning(true);
     addLog('system', `> Executing ${activeFile.name}...`);
     
     workerRef.current.postMessage({ action: 'run', id: Date.now(), python: activeFile.content });
-  };
+  }, [files, activeFileId, isPyodideReady, isPreviewOpen, addLog]);
 
   const handleFormat = () => {
     if (!isPyodideReady || !workerRef.current) {
@@ -227,7 +402,7 @@ except Exception as e:
     });
   };
 
-  const handleAddFile = (name: string, content: string = '# New script\\n', isFolder: boolean = false, parentId: string | null = null) => {
+  const handleAddFile = (name: string, content: string = '# New script\n', isFolder: boolean = false, parentId: string | null = null) => {
     const newFile: FileNode = {
       id: crypto.randomUUID(),
       name,
@@ -271,6 +446,23 @@ except Exception as e:
 
   const activeFile = files.find(f => f.id === activeFileId);
   const [showCredits, setShowCredits] = useState(false);
+
+  // Sync web sandbox iframe outputs with active IDE console
+  useEffect(() => {
+    const handleIframeMessage = (e: MessageEvent) => {
+      if (e.data) {
+        if (e.data.type === 'iframe-log') {
+          addLog('log', `[Web Logger] ${e.data.text}`);
+        } else if (e.data.type === 'iframe-warn') {
+          addLog('system', `[Web Warning] ${e.data.text}`);
+        } else if (e.data.type === 'iframe-error') {
+          addLog('error', `[Web Error] ${e.data.text}`);
+        }
+      }
+    };
+    window.addEventListener('message', handleIframeMessage);
+    return () => window.removeEventListener('message', handleIframeMessage);
+  }, [addLog]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -349,19 +541,34 @@ except Exception as e:
             onSelectTab={handleSelectFile}
             onCloseTab={handleCloseTab}
           />
-          <div className="flex-1 min-h-0 relative">
+          <div className="flex-1 min-h-0 relative flex flex-row">
             {activeFile ? (
-              <Editor
-                content={activeFile.content}
-                onChange={handleEditorChange}
-                onRun={handleRun}
-                onFormat={handleFormat}
-                isRunning={isRunning || !isPyodideReady}
-                isFormatting={isFormatting}
-                fileName={activeFile.name}
-              />
+              <>
+                <div className="flex-1 min-w-0 h-full">
+                  <Editor
+                    content={activeFile.content}
+                    onChange={handleEditorChange}
+                    onRun={handleRun}
+                    onFormat={activeFile.name.endsWith('.py') ? handleFormat : undefined}
+                    isRunning={activeFile.name.endsWith('.py') ? (isRunning || !isPyodideReady) : false}
+                    isFormatting={isFormatting}
+                    fileName={activeFile.name}
+                    isPreviewOpen={isPreviewOpen}
+                    onTogglePreview={() => setIsPreviewOpen(prev => !prev)}
+                  />
+                </div>
+                {isPreviewOpen && ['html', 'htm', 'js', 'jsx', 'ts', 'tsx', 'css'].includes(activeFile.name.split('.').pop()?.toLowerCase() || '') && (
+                  <div className="w-1/2 min-w-[320px] h-full flex-shrink-0 border-l border-dark-border">
+                    <LivePreview
+                      activeFile={activeFile}
+                      files={files}
+                      onAddLog={addLog}
+                    />
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="h-full flex items-center justify-center text-text-muted italic font-serif opacity-60">
+              <div className="h-full w-full flex items-center justify-center text-text-muted italic font-serif opacity-60">
                 Select or create a file to start coding.
               </div>
             )}
