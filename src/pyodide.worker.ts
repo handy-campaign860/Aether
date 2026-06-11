@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 // Ensure fetch is configurable so Pyodide doesn't crash when trying to patch it
-if (typeof self !== 'undefined') {
+if (typeof window === 'undefined' && typeof self !== 'undefined') {
   const originalFetch = self.fetch;
   try {
     Object.defineProperty(self, 'fetch', {
@@ -14,11 +14,29 @@ if (typeof self !== 'undefined') {
   }
 }
 
-import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.mjs";
+let loadPyodide: any;
+
+// Compatibly load Pyodide in both classic and module workers
+if (typeof importScripts === 'function') {
+  try {
+    // Classic web worker compatibility inside built/production environments
+    importScripts("https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js");
+    loadPyodide = (self as any).loadPyodide;
+  } catch (e) {
+    console.warn("importScripts failed in worker pool, falling back to dynamic import:", e);
+  }
+}
 
 let pyodideReadyPromise;
 
 async function loadPyodideAndPackages() {
+  if (!loadPyodide) {
+    // Module worker compatibility (e.g. Vite dev or modern module workers)
+    // @ts-ignore
+    const pyodideModule = await import("https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.mjs");
+    loadPyodide = pyodideModule.loadPyodide;
+  }
+
   // @ts-ignore
   self.pyodide = await loadPyodide({
     stdout: (text) => {
