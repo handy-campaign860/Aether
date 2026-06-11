@@ -1,0 +1,6 @@
+{
+  "name": "Aether Python IDE",
+  "description": "A dark, graceful web-based Python IDE with built-in terminal and real-time editing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
