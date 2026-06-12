@@ -1,6 +1,6 @@
 # 🌌 Aether Python IDE
 
-A dark, graceful, and highly performant web-based IDE for Python development, designed with a focus on Zen aesthetics, modular space, and in-browser compilation.
+A dark, graceful, and highly performant web-based IDE for Python development, designed with a focus on Zen aesthetics, modular space, and in-browser compilation..
 
 ---
 
